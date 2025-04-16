@@ -1,0 +1,6 @@
+exp2/data
+__pycache__
+checkpoints
+logs
+*.doc
+*.docx
