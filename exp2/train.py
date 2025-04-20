@@ -19,6 +19,8 @@ from PIL import Image
 from tqdm import tqdm
 import toml
 from torch.amp import autocast, GradScaler
+import torch.distributed as dist
+from torch.nn.parallel import DataParallel, DistributedDataParallel
 
 # 设置随机种子以确保结果可复现
 def set_seed(seed):
@@ -26,6 +28,88 @@ def set_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+
+def setup_gpus(config):
+    """设置GPU使用环境，尊重配置文件中的设置"""
+    # 首先检查系统是否有CUDA设备
+    if not torch.cuda.is_available():
+        print("警告: 未检测到CUDA设备，将使用CPU进行训练")
+        return torch.device("cpu")
+    
+    # 获取系统中可用的GPU数量
+    system_gpu_count = torch.cuda.device_count()
+    print(f"系统中检测到 {system_gpu_count} 个GPU")
+    
+    # 检查配置中是否有GPU设置
+    if 'hardware' not in config or 'gpus' not in config['hardware']:
+        # 默认使用第一个GPU
+        print(f"未指定GPU，默认使用GPU 0")
+        return torch.device("cuda:0")
+    
+    gpus = config['hardware']['gpus']
+    
+    # 如果gpus为空列表或None，使用第一个可用GPU
+    if not gpus:
+        print(f"未指定具体GPU，将使用GPU 0")
+        return torch.device("cuda:0")
+    
+    # 验证指定的GPU是否超出范围
+    valid_gpus = []
+    for gpu_id in gpus:
+        if gpu_id >= system_gpu_count:
+            print(f"警告: 请求的GPU ID {gpu_id} 超出了可用范围(0-{system_gpu_count-1})。")
+        else:
+            valid_gpus.append(gpu_id)
+    
+    # 如果没有有效的GPU ID，使用第一个可用的GPU
+    if not valid_gpus:
+        print(f"警告: 所有指定的GPU ID都不可用，将使用GPU 0")
+        return torch.device("cuda:0")
+    
+    # 始终返回第一个有效的GPU作为主设备
+    primary_gpu = valid_gpus[0]
+    print(f"设置主GPU为: cuda:{primary_gpu}")
+    return torch.device(f"cuda:{primary_gpu}")
+
+
+def wrap_model_for_multi_gpu(model, config, device):
+    """根据配置将模型包装为多GPU模式，仅当配置文件要求使用多个GPU时才包装"""
+    if device.type != 'cuda':
+        return model
+    
+    # 检查配置文件中指定的GPU
+    if 'hardware' not in config or 'gpus' not in config['hardware']:
+        # 配置中未指定GPU，默认使用单GPU
+        print("配置中未指定GPU，使用单GPU模式")
+        return model
+    
+    requested_gpus = config['hardware'].get('gpus', [])
+    
+    # 如果配置中请求的GPU数量为0或1，不进行包装
+    if len(requested_gpus) <= 1:
+        print(f"配置中只请求了{len(requested_gpus)}个GPU，使用单GPU模式")
+        return model
+    
+    # 检查系统中可用的GPU数量
+    system_gpu_count = torch.cuda.device_count()
+    
+    # 过滤出有效的GPU ID
+    valid_gpus = [gpu_id for gpu_id in requested_gpus if gpu_id < system_gpu_count]
+    
+    # 如果有效GPU数量小于等于1，不进行包装
+    if len(valid_gpus) <= 1:
+        print(f"配置中请求的多个GPU中，只有{len(valid_gpus)}个有效，使用单GPU模式")
+        return model
+    
+    # 到这里，确认配置请求多GPU且系统确实有多个可用的GPU
+    print(f"配置请求使用多个GPU {requested_gpus}，有效GPU: {valid_gpus}")
+    print(f"将模型包装为DataParallel模式")
+    
+    # 使用DataParallel包装模型，只使用配置中指定的有效GPU
+    model = DataParallel(model, device_ids=valid_gpus)
+    
+    return model
+
 
 # 修改train_epoch函数
 def train_epoch(model, dataloader, criterion, optimizer, device, scaler=None):
@@ -212,23 +296,29 @@ def main(args):
                 f.write(f"    {key}: {value}\n")
         f.write("\n=== Training Progress ===\n")
     
+    # 设置GPU
+    try:
+        device = setup_gpus(config)
+        print(f"主设备: {device}")
+    except Exception as e:
+        print(f"GPU设置出错，将使用CPU: {e}")
+        device = torch.device("cpu")
+    
     # 设置随机种子
     set_seed(config['training']['seed'])
     
-    # 设置设备
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"使用设备: {device}")
-    
     # 创建数据集和数据加载器，获取类别权重
-    train_loader, valid_loader, pos_weight = prepare_data(
-        config['dataset']['data_dir'], 
-        config['dataset']['batch_size'], 
-        config['dataset']['img_size'], 
-        config['dataset']['num_workers']
-    )
+    train_loader, valid_loader, pos_weight = prepare_data(config)
     
-    # 创建模型
+    # 创建模型并移动到GPU
     model = create_model(config, device)
+    
+    # 根据配置决定是否使用多GPU
+    try:
+        model = wrap_model_for_multi_gpu(model, config, device)
+    except Exception as e:
+        print(f"多GPU包装出错: {e}")
+        print("将继续使用单GPU")
     
     # 将计算得到的正样本权重转换为张量并移至设备
     pos_weight_tensor = torch.tensor([pos_weight], device=device)
