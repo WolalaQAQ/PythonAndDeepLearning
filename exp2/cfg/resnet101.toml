@@ -1,0 +1,42 @@
+[dataset]
+data_dir = "./data/hand"
+img_size = 320
+batch_size = 256
+num_workers = 4
+use_cache = true
+
+[augmentation]
+# 数据增强参数
+h_flip_prob = 0.5      # 水平翻转概率
+v_flip_prob = 0.3      # 垂直翻转概率
+rotation_degrees = 20  # 旋转角度范围
+brightness = 0.2       # 亮度变化范围
+contrast = 0.2         # 对比度变化范围
+saturation = 0.2       # 饱和度变化范围
+hue = 0.1              # 色调变化范围
+translate = 0.1        # 平移范围
+scale = 0.1            # 缩放范围
+random_crop = true     # 是否使用随机裁剪
+crop_scale_min = 0.8   # 随机裁剪时的最小比例
+blur_prob = 0.2        # 高斯模糊概率
+blur_kernel_size = 5   # 高斯模糊核大小，必须是奇数
+grayscale_prob = 0.1   # 随机灰度转换概率
+use_random_erase = true # 是否使用随机擦除
+erase_prob = 0.2       # 随机擦除概率
+
+[model]
+model_name = "resnet101"
+dropout = 0.3          # dropout比率，ResNet通常使用较小的dropout
+pretrained = ""        # 预训练模型路径，为空则不使用预训练
+
+[training]
+epochs = 100
+lr = 1.0e-4
+min_lr = 1.0e-6
+weight_decay = 0.05
+seed = 42
+save_freq = 10
+use_amp = true         # 是否使用混合精度训练
+
+[hardware]
+gpus = [1]             # 指定要使用的GPU ID列表
