@@ -1,6 +1,8 @@
 from prepare_data import prepare_data
-# from net.swin_transformer import SwinTransformer
 from net.inceptionv3 import inception_v3, InceptionV3
+from net.densenet_169_v2 import densenet169_v2
+from net.vgg19 import vgg19_bn
+from net.resnet101 import resnet101
 
 import os
 import argparse
@@ -222,28 +224,31 @@ def create_model(config, device):
     """根据配置创建模型"""
     model_name = config['model']['model_name']
     
-    if model_name == "swin_transformer":
-        model = SwinTransformer(
-            img_size=config['dataset']['img_size'],
-            patch_size=4,
-            in_chans=3,
-            num_classes=1,  # 改为1个输出，用于二元分类
-            embed_dim=96,
-            depths=config['model']['depths'],
-            num_heads=config['model']['num_heads'],
-            window_size=7,
-            mlp_ratio=4.,
-            qkv_bias=True,
-            drop_rate=config['model']['drop_rate'],
-            attn_drop_rate=config['model']['attn_drop_rate'],
-            drop_path_rate=config['model']['drop_path_rate'],
-            norm_layer=nn.LayerNorm
-        )
-    elif model_name == "inception_v3":
+    if model_name == "inception_v3":
         model = inception_v3(
             num_classes=2,  # 保持为2，我们会在forward中选择第二个输出
             pretrained=False,
             input_size=config['dataset']['img_size']
+        )
+    elif model_name == "densenet169_v2":
+        model = densenet169_v2(
+            num_classes=2,  # 保持为2类输出
+            pretrained=False,
+            drop_rate=config['model']['drop_rate'],
+            memory_efficient=config['model'].get('memory_efficient', False),
+            img_size=config['dataset']['img_size']
+        )
+    elif model_name == "vgg19_bn":
+        model = vgg19_bn(
+            num_classes=2,
+            dropout=config['model'].get('dropout', 0.5),
+            init_weights=True
+        )
+    elif model_name == "resnet101":  # 添加这个条件分支
+        model = resnet101(
+            num_classes=2,
+            dropout=config['model'].get('dropout', 0.3),
+            init_weights=True
         )
     else:
         raise ValueError(f"不支持的模型: {model_name}")
@@ -471,7 +476,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="训练脚本")
     
     # 添加配置文件路径参数
-    parser.add_argument('--config', type=str, default='./cfg/inceptionv3.toml',
+    parser.add_argument('--config', type=str, default='./cfg/resnet101.toml',
                         help='配置文件路径')
     parser.add_argument('--runs_dir', type=str, default='./runs',
                         help='实验结果根目录')
