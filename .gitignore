@@ -5,3 +5,4 @@ logs
 *.doc
 *.docx
 runs
+exp2/model_viz
