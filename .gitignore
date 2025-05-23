@@ -6,3 +6,4 @@ logs
 *.docx
 runs
 exp2/model_viz
+course_design1/data
