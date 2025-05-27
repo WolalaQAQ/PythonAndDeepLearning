@@ -260,8 +260,60 @@ def main(args):
     set_seed(config['training']['seed'])
     
     # 创建数据集和数据加载器 - 修改为CIFAR-10专用函数
-    train_loader, valid_loader = prepare_cifar10(config)
-    
+    try:
+        train_loader, valid_loader = prepare_cifar10(config)
+        print("成功加载数据，使用完整的数据增强")
+    except OverflowError as e:
+        print(f"数据增强参数导致溢出错误: {e}")
+        print("尝试使用保守的数据增强参数...")
+        # 创建一个修改后的配置，禁用可能导致溢出的数据增强
+        modified_config = config.copy()
+        if 'data' not in modified_config:
+            modified_config['data'] = {}
+        modified_config['data']['use_data_augmentation'] = False
+        modified_config['data']['num_workers'] = 0
+        try:
+            train_loader, valid_loader = prepare_cifar10(modified_config)
+            print("成功加载数据，已禁用数据增强")
+        except Exception as e2:
+            print(f"禁用数据增强后仍有错误: {e2}")
+            # 最后的降级方案：使用最基本的配置
+            basic_config = {
+                'data': {
+                    'batch_size': 32,
+                    'num_workers': 0,
+                    'use_data_augmentation': False,
+                    'pin_memory': False
+                }
+            }
+            train_loader, valid_loader = prepare_cifar10(basic_config)
+            print("使用基本配置成功加载数据")
+    except Exception as e:
+        print(f"数据加载出错: {e}")
+        print("尝试使用更保守的数据加载参数...")
+        # 创建一个修改后的配置，设置 num_workers=0
+        modified_config = config.copy()
+        if 'data' not in modified_config:
+            modified_config['data'] = {}
+        modified_config['data']['num_workers'] = 0
+        modified_config['data']['use_data_augmentation'] = False
+        try:
+            train_loader, valid_loader = prepare_cifar10(modified_config)
+            print("成功加载数据，已禁用数据增强和多进程")
+        except Exception as e2:
+            print(f"保守配置仍有错误: {e2}")
+            # 最后的降级方案
+            basic_config = {
+                'data': {
+                    'batch_size': 16,
+                    'num_workers': 0,
+                    'use_data_augmentation': False,
+                    'pin_memory': False
+                }
+            }
+            train_loader, valid_loader = prepare_cifar10(basic_config)
+            print("使用最基本配置成功加载数据")
+
     # 创建模型
     model = create_model(config, device)
     
