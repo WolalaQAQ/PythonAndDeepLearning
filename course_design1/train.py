@@ -196,7 +196,14 @@ def create_model(config, device):
     model_name = config['model']['model_name']
     
     if model_name == "alexnet":
-        model = AlexNet(drop_out=config['model']['drop_out'], num_classes=10)  # CIFAR-10有10个类别
+        # 从配置中获取层归一化参数，默认为False
+        use_layer_norm = config['model'].get('use_layer_norm', False)
+        model = AlexNet(
+            drop_out=config['model']['drop_out'], 
+            num_classes=10,  # CIFAR-10有10个类别
+            use_layer_norm=use_layer_norm
+        )
+        print(f"创建AlexNet模型 - 层归一化: {'启用' if use_layer_norm else '禁用'}")
     else:
         raise ValueError(f"不支持的模型: {model_name}")
     

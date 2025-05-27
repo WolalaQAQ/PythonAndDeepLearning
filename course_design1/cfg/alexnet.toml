@@ -27,6 +27,7 @@ erase_prob = 0.1       # 随机擦除概率
 [model]
 model_name = "alexnet"
 drop_out = 0.5         # 修改参数名称为drop_out
+use_layer_norm = false # 是否启用层归一化
 pretrained = ""        # 预训练模型路径，为空则不使用预训练
 
 [training]
