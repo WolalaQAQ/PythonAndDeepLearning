@@ -1,7 +1,7 @@
 [dataset]
 data_dir = "./data"
 img_size = 32
-batch_size = 128
+batch_size = 512
 num_workers = 4
 use_cache = true
 
@@ -13,7 +13,7 @@ rotation_degrees = 15  # 旋转角度范围
 brightness = 0.2       # 亮度变化范围
 contrast = 0.2         # 对比度变化范围
 saturation = 0.2       # 饱和度变化范围
-hue = 0.1              # 色调变化范围
+hue = 0.0              # 色调变化范围
 translate = 0.1        # 平移范围
 scale = 0.1            # 缩放范围
 random_crop = false    # 随机裁剪
@@ -30,7 +30,7 @@ drop_out = 0.5         # 修改参数名称为drop_out
 pretrained = ""        # 预训练模型路径，为空则不使用预训练
 
 [training]
-epochs = 200
+epochs = 150
 lr = 1.0e-3
 min_lr = 1.0e-6
 weight_decay = 5.0e-4
@@ -39,4 +39,4 @@ save_freq = 20
 use_amp = true         # 是否使用混合精度训练
 
 [hardware]
-gpus = [0]             # 指定要使用的GPU ID列表
+gpus = [1]             # 指定要使用的GPU ID列表
