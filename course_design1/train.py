@@ -20,6 +20,7 @@ from torch.nn.parallel import DataParallel, DistributedDataParallel
 
 # 导入模型和数据准备函数
 from net.alexnet import AlexNet
+from net.resnet import resnet18
 from prepare_data import prepare_cifar10
 
 # 设置随机种子以确保结果可复现
@@ -192,7 +193,7 @@ def load_config(config_path):
 
 # 创建模型
 def create_model(config, device):
-    """根据配置创建AlexNet模型"""
+    """根据配置创建模型"""
     model_name = config['model']['model_name']
     
     if model_name == "alexnet":
@@ -204,6 +205,13 @@ def create_model(config, device):
             use_layer_norm=use_layer_norm
         )
         print(f"创建AlexNet模型 - 层归一化: {'启用' if use_layer_norm else '禁用'}")
+    elif model_name == "resnet18":
+        model = resnet18(
+            num_classes=10,  # CIFAR-10有10个类别
+            dropout=config['model'].get('dropout', 0.5),
+            init_weights=config['model'].get('init_weights', True)
+        )
+        print(f"创建ResNet18模型 - Dropout: {config['model'].get('dropout', 0.5)}")
     else:
         raise ValueError(f"不支持的模型: {model_name}")
     
@@ -477,7 +485,7 @@ def get_next_exp_id(runs_dir):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="CIFAR-10 AlexNet训练脚本")
     
-    parser.add_argument('--config', type=str, default='./cfg/alexnet.toml',
+    parser.add_argument('--config', type=str, default='./cfg/resnet18.toml',
                         help='配置文件路径')
     parser.add_argument('--runs_dir', type=str, default='./runs',
                         help='实验结果根目录')
